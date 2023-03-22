@@ -38,35 +38,63 @@ This project is based on the "Sending messages asynchronously" chapter of "Sprin
 
 ## ⚙️ How it Works
 
-This project uses Spring to implement asynchronous messaging for the Taco Cloud application. Messages are sent from the website to the kitchens using JMS, RabbitMQ and AMQP, or Kafka. Spring provides support for each of these messaging technologies through the Spring JMS, Spring RabbitMQ, and Spring Kafka libraries.
+This project leverages the Spring framework to implement asynchronous messaging in the Taco Cloud application. Asynchronous messaging allows for communication between the website and the kitchens to occur independently of one another, improving the responsiveness and scalability of the system.
 
-To receive messages, Spring supports message-driven POJOs. These POJOs can be annotated with the @JmsListener, @RabbitListener, or @KafkaListener annotations to listen for messages on a specific queue or topic. The method annotated with these annotations is called when a message is received on the specified queue or topic.
-
+To enable this functionality, the application uses the Java Messaging Service (JMS), RabbitMQ with the Advanced Message Queuing Protocol (AMQP), or Kafka messaging technologies, all of which are supported by the Spring framework.
 
 <div id="code-examples"></div>
 
 ## 💻 Code Examples
-Here is an example of a Spring JMS message-driven POJO that listens for messages on a specific queue:
+**1. An exemple of JMS messaging implementation:**
 ```java
-@Component
-public class OrderMessagingListener {
+@Service
+public class JmsOrderMessagingService implements OrderMessagingService {
 
-    private final JmsTemplate jmsTemplate;
+  private JmsTemplate jms;
 
-    public OrderMessagingListener(JmsTemplate jmsTemplate) {
-        this.jmsTemplate = jmsTemplate;
-    }
+  @Autowired
+  public JmsOrderMessagingService(JmsTemplate jms) {
+    this.jms = jms;
+  }
 
-    @JmsListener(destination = "tacocloud.order.queue")
-    public void receiveOrder(Order order) {
-        // Process the order
-        System.out.println("Received order: " + order);
-        // Send a confirmation message
-        jmsTemplate.convertAndSend("tacocloud.order.queue", "Order received");
-    }
+  @Override
+  public void sendOrder(TacoOrder order) {
+    jms.convertAndSend("tacocloud.order.queue", order,
+        this::addOrderSource);
+  }
+  
+  private Message addOrderSource(Message message) throws JMSException {
+    message.setStringProperty("X_ORDER_SOURCE", "WEB");
+    return message;
+  }
+
 }
 ```
-In this code example, the ```@JmsListener(destination = "tacocloud.order.queue")``` annotation specifies that this method should listen for messages on the "tacocloud.order.queue" queue. When a message is received, the receiveOrder method is called with the message payload as a parameter. The method processes the order and sends a confirmation message back to the same queue using the ```jmsTemplate.convertAndSend``` method.
+This code snippet shows how to implement an order messaging service using the Java Messaging Service (JMS) in a Spring application. The ```JmsOrderMessagingService``` class implements the ```OrderMessagingService``` interface and provides a ```sendOrder``` method to send ```TacoOrder``` objects to the "tacocloud.order.queue" destination using the ```convertAndSend``` method of the jms object.
+
+**2. An exemple of Kafka messaging implementation:**
+```java
+@Service
+public class KafkaOrderMessagingService
+                                  implements OrderMessagingService {
+  
+  private KafkaTemplate<String, TacoOrder> kafkaTemplate;
+  
+  @Autowired
+  public KafkaOrderMessagingService(
+          KafkaTemplate<String, TacoOrder> kafkaTemplate) {
+    this.kafkaTemplate = kafkaTemplate;
+  }
+  
+  @Override
+  public void sendOrder(TacoOrder order) {
+    kafkaTemplate.send("tacocloud.orders.topic", order);
+  }
+  
+}
+```
+This code snippet shows how to implement an order messaging service using Apache Kafka in a Spring application. The ```KafkaOrderMessagingService``` class implements the ```OrderMessagingService``` interface and provides a ```sendOrder``` method to send ```TacoOrder``` objects to the "tacocloud.orders.topic" topic using the send method of the ```kafkaTemplate``` object.
+
 <div id="acknowledgements"></div>
 
 ## 📚 Acknowledgements 
